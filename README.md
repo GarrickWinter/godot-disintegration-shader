@@ -1,6 +1,10 @@
 # A Disintegration Shader for Sprite3D in Godot 4.2
 This is not a full guide, but is intended as an example and starting point for a way to achieve a disintegration effect (also sometimes called "dissolving") in Godot 4.2.
 
+The effect achieved in this resource:
+
+![An image of the Godot robot disintegrating into an upwards spray of particles.](https://i.imgur.com/dnGPswU.gif)
+
 This approach works with a Sprite3D and a childed GPUParticles3D node. Both nodes have custom shaders; the Sprite3D has a simple spatial shader for managing the gradual disappearance of the sprite, while the GPUParticles3D has a more elaborate particle shader for creating particles based on the sprite's texture.
 
 # Analyzing a Functional Particle Shader 

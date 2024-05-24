@@ -8,7 +8,7 @@
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_ixhem"]
 render_priority = 0
 shader = ExtResource("1_kdhuj")
-shader_parameter/cutoff = 0.357736
+shader_parameter/cutoff = 1.0
 shader_parameter/tex = ExtResource("1_dnn0r")
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_fquat"]
@@ -66,9 +66,12 @@ offset = Vector2(-182, 0)
 texture = ExtResource("1_dnn0r")
 script = ExtResource("2_ykyho")
 disintegration_time = 2.0
+disintegrating = false
+one_shot = true
 
 [node name="Particles" type="GPUParticles3D" parent="."]
 sorting_offset = 1.0
+emitting = false
 amount = 125216
 lifetime = 2.0
 visibility_aabb = AABB(-2, 0, -0.5, 4, 4, 1)

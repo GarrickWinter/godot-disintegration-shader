@@ -65,11 +65,19 @@ public partial class DisintegratingSprite : Sprite3D
 			lifespan += delta;
 			ShaderMaterial spriteShader = (ShaderMaterial)MaterialOverride;
 			double ratio = (lifespan % disintegration_time) / disintegration_time;
-			spriteShader.SetShaderParameter("cutoff", ratio);
-
-			if (one_shot && lifespan >= disintegration_time)
+			//If we went over disintegration_time, ratio will be very low, causing the sprite to flicker at almost full visibility
+			//To make sure that doesn't happen, if we exceeded the time, just set the cutoff to exactly 1f
+			if (lifespan >= disintegration_time)
 			{
-				disintegrating = false;
+				spriteShader.SetShaderParameter("cutoff", 1f);
+				if (one_shot)
+				{
+					disintegrating = false;
+				}
+			}
+			else
+			{
+				spriteShader.SetShaderParameter("cutoff", ratio);
 			}
 		}
 	}
