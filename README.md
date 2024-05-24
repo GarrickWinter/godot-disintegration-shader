@@ -13,9 +13,9 @@ I proceeded to read through most of the shader line-by-line to figure out what i
 # Editor Previewing
 When previewing the DisintegratingSprite in the editor, there are three script properties on the Sprite3D that help with editor previewing of the effect:
 
-- Disintegration Time: This is how many seconds is takes for the sprite to disintegrate. The sprite uses this to change the lifetime of the particles, which in turn changes the speed of particle spawning, so changing the GPUParticles3D's Lifetime independently can break the disintegration effect. 
-- Disintegrating: If true, the effect is playing. You can tick it on and off to effectively restart the effect.
-- One Shot: If true, the sprite disintegrates once and then stays gone; otherwise, it repeats the disintegration cycle, which can be convenient but is also messy because the particles overlap and get mixed together.
+- **Disintegration Time**: This is how many seconds is takes for the sprite to disintegrate. The sprite uses this to change the lifetime of the particles, which in turn changes the speed of particle spawning, so changing the GPUParticles3D's Lifetime independently can break the disintegration effect. 
+- **Disintegrating**: If true, the effect is playing. You can tick it on and off to effectively restart the effect.
+- **One Shot**: If true, the sprite disintegrates once and then stays gone; otherwise, it repeats the disintegration cycle, which can be convenient but is also messy because the particles overlap and get mixed together.
 
 # Credit
 
