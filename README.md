@@ -23,6 +23,6 @@ When previewing the DisintegratingSprite in the editor, there are three script p
 
 # Credit
 
-Thanks to **astridson**, whose [much more refined shaders and shader work](https://github.com/Astridson/godot-disintegration-effect-examples) started me on the path to figuring this out for the newer particle shader system.
+Thanks to **Astridson**, whose [much more refined shaders and shader work](https://github.com/Astridson/godot-disintegration-effect-examples) started me on the path to figuring this out for the newer particle shader system.
 
 Thanks to **omggomb** on the Godot forums, [whose post here](https://forum.godotengine.org/t/where-can-i-find-a-copy-of-the-default-spatial-shader/19078) helped me understand how to extract a fully written-out shader from a default material, which was necessary for working through this problem.
