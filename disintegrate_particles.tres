@@ -1,0 +1,427 @@
+[gd_resource type="Shader" format=3 uid="uid://ch7b5a2yxhjlw"]
+
+[resource]
+code = "//GODOT 4.2 PARTICLE SHADER ANALYSIS (4.2.2.stable.mono)
+//This shader is provided with the intent to showcase a working example of a Particle Shader in Godot 4.2 
+//A GPUParticles3D node was set up with a ParticleProcessMaterial, which was configured to produce a desired particle effect
+//The material was then converted to a ShaderMaterial, which generates a written shader script
+//The resulting shader script was saved, and then read through and edited, while watching the emitter in the editor to avoid changing behaviour.
+//Edits include: 
+//- Removing several unused variables, or variables that duplicated built-in constants
+//- Renaming variables and functions with confusing or inconsistent names
+//- Reordering lines so that variables are declared or calculated reasonably close to where they are actually used
+//- Commenting extensively with notes on what is happening (including seemingly obvious notes)
+//- Replacing almost all original comments. If they were preserved, they are now tagged with \"ORIGINAL:\"
+
+//This is the kind of shader we're trying to figure out
+shader_type particles;
+//This allows manual position calculation, which we'll be doing
+render_mode disable_velocity;
+
+//DISINTEGRATE UNIFORMS
+uniform sampler2D sprite_texture;
+
+//ORIGINAL UNIFORMS
+//These uniforms can be set as shader parameters in the editor or through script
+//Many may be unnecessary for a given use, but are left in to avoid hiding useful information
+//All default values have been set to replicate the values used in the example, for clarity when porting
+uniform vec3 direction = vec3(0, 1, 0);
+uniform float spread = 0;
+uniform float flatness = 1;
+uniform float inherit_emitter_velocity_ratio = 0;
+uniform float initial_linear_velocity_min = 3;
+uniform float initial_linear_velocity_max = 3;
+uniform float directional_velocity_min = 1;
+uniform float directional_velocity_max = 1;
+uniform float angular_velocity_min = 0;
+uniform float angular_velocity_max = 0;
+uniform float orbit_velocity_min = 0;
+uniform float orbit_velocity_max = 0;
+uniform float radial_velocity_min = 0;
+uniform float radial_velocity_max = 0;
+uniform float linear_accel_min = 0;
+uniform float linear_accel_max = 0;
+uniform float radial_accel_min = 0;
+uniform float radial_accel_max = 0;
+uniform float tangent_accel_min = 0;
+uniform float tangent_accel_max = 0;
+uniform float damping_min = 0;
+uniform float damping_max = 0;
+uniform float initial_angle_min = 0;
+uniform float initial_angle_max = 0;
+uniform float scale_min = 1;
+uniform float scale_max = 1;
+uniform float anim_speed_min = 0;
+uniform float anim_speed_max = 0;
+uniform float anim_offset_min = 0;
+uniform float anim_offset_max = 0;
+uniform float lifetime_randomness = 0;
+uniform vec3 emission_shape_offset = vec3(0.0);
+uniform vec3 emission_shape_scale = vec3(1.0);
+uniform vec3 velocity_pivot = vec3(0.0);
+uniform vec3 emission_box_extents = vec3(1.5, 0.0, 0.0);
+uniform vec3 gravity = vec3(0.0);
+
+//Yields a pseudorandom value between 0.0 and 1.0
+float rand_from_seed(inout uint seed)
+{
+	int k;
+	int s = int(seed);
+	if (s == 0)
+	s = 305420679;
+	k = s / 127773;
+	s = 16807 * (s - k * 127773) - 2836 * k;
+	if (s < 0)
+		s += 2147483647;
+	seed = uint(s);
+	return float(seed % uint(65536)) / 65535.0;
+}
+
+//Yields a pseudorandom value between -1.0 and 1.0
+float rand_from_seed_neg1_pos1(inout uint seed)
+{
+	return rand_from_seed(seed) * 2.0 - 1.0;
+}
+
+//I don't understand hashing, but as far as I can tell it produces a fixed pseudorandom number from an input
+uint hash(uint x)
+{
+	//Bit-wise shifts and bit-wise exclusive ORs
+	x = ((x >> uint(16)) ^ x) * uint(73244475);
+	x = ((x >> uint(16)) ^ x) * uint(73244475);
+	x = (x >> uint(16)) ^ x;
+	return x;
+}
+
+//Calculates the pixel from a given base number
+vec2 uv_from_pixel_index(uint index)
+{
+	//The second parameter here is LOD (level of detail); we use 0 to get the \"base\" value
+	ivec2 tex_size = textureSize(sprite_texture, 0);
+	//Next, figure out the pixel coordinates this index corresponds to
+	//Note that if the index we use higher than the number of pixels in the sprite, we'll wrap around
+	//For example, for a 4x4 texture, index=18 would yield X=2,Y=0, which is up near the start again
+	int pixel_x = int(index) % tex_size.x;
+    int pixel_y = (int(index) / tex_size.x) % (tex_size.y);
+	//We're going to calculate ratios, i.e. how far along the texture's X and Y the pixel starts
+	//We can't just use raw pixel values; we need to adjust for the size of the texture in the world
+	//We use the emission_box_extents to define the area that maps to the texture
+	float uv_x = float(pixel_x) / float(tex_size.x);
+	float uv_y = float(pixel_y) / float(tex_size.y);
+	return vec2(uv_x, uv_y);
+}
+
+struct DisplayParameters
+{
+	vec3 scale;
+	float animation_speed;
+	float animation_offset;
+	float lifetime;
+	vec4 color;
+};
+
+struct DynamicsParameters
+{
+	float angle;
+	float angular_velocity;
+	float initial_velocity_multiplier;
+	float directional_velocity;
+	float radial_velocity;
+	float orbit_velocity;
+};
+
+struct PhysicsParameters
+{
+	float linear_accel;
+	float radial_accel;
+	float tangent_accel;
+	float damping;
+};
+
+//Used once during start() and once during process()
+//Operates on physics properties (several accelerations and damping)
+void calculate_initial_physics_params(inout PhysicsParameters params, inout uint alt_seed)
+{
+	params.linear_accel = mix(linear_accel_min, linear_accel_max, rand_from_seed(alt_seed));
+	params.radial_accel = mix(radial_accel_min, radial_accel_max, rand_from_seed(alt_seed));
+	params.tangent_accel = mix(tangent_accel_min, tangent_accel_max, rand_from_seed(alt_seed));
+	params.damping = mix(damping_min, damping_max, rand_from_seed(alt_seed));
+}
+
+//Used once during start() and once during process()
+//Operates on dynamics properties (angle and several velocities)
+void calculate_initial_dynamics_params(inout DynamicsParameters params,inout uint alt_seed)
+{
+	//ORIGINAL: -------------------- DO NOT REORDER OPERATIONS, IT BREAKS VISUAL COMPATIBILITY
+	//ORIGINAL: -------------------- ADD NEW OPERATIONS AT THE BOTTOM
+	params.angle = mix(initial_angle_min, initial_angle_max, rand_from_seed(alt_seed));
+	params.angular_velocity = mix(angular_velocity_min, angular_velocity_max, rand_from_seed(alt_seed));
+	params.initial_velocity_multiplier = mix(initial_linear_velocity_min, initial_linear_velocity_max,rand_from_seed(alt_seed));
+	params.directional_velocity = mix(directional_velocity_min, directional_velocity_max,rand_from_seed(alt_seed));
+	params.radial_velocity = mix(radial_velocity_min, radial_velocity_max,rand_from_seed(alt_seed));
+	params.orbit_velocity = mix(orbit_velocity_min, orbit_velocity_max,rand_from_seed(alt_seed));
+}
+
+//Used once during start() and once during process()
+//Operates on visual properties (scale, animation speed/offset, lifetime, color)
+void calculate_initial_display_params(inout DisplayParameters params, inout uint alt_seed, uint base_number)
+{
+	//ORIGINAL: -------------------- DO NOT REORDER OPERATIONS, IT BREAKS VISUAL COMPATIBILITY
+	//ORIGINAL: -------------------- ADD NEW OPERATIONS AT THE BOTTOM
+	params.scale = vec3(mix(scale_min, scale_max, rand_from_seed(alt_seed)));
+	params.scale = sign(params.scale) * max(abs(params.scale), 0.001);
+	params.animation_speed = mix(anim_speed_min, anim_speed_max, rand_from_seed(alt_seed));
+	params.animation_offset = mix(anim_offset_min, anim_offset_max, rand_from_seed(alt_seed));
+	params.lifetime = (1.0 - lifetime_randomness * rand_from_seed(alt_seed));
+	//Now figure out the pixel coordinates this base_number corresponds to, using our handy function
+	vec2 texture_pixels = uv_from_pixel_index(base_number);
+	vec4 tex_color = texture(sprite_texture, texture_pixels);
+	params.color = tex_color;
+}
+
+//Used only once, in start(), to determine where a particle starts
+vec3 start_position_from_texture(inout uint alt_seed, uint base_number)
+{
+	//Next, figure out the pixel coordinates this base_number corresponds to, using our handy function
+	vec2 pixel_uv = uv_from_pixel_index(base_number);
+	//We subtract the UV.y from 1.0 because on the texture, Y increases downwards, but in 3D space, Y increases upwards
+	//We leave Z at 0, and only set X and Y
+	vec3 pos = vec3(pixel_uv.x, 1.0 - pixel_uv.y, 0.0) * emission_box_extents;
+	//pos = vec3(rand_from_seed(alt_seed) * 2.0 - 1.0, rand_from_seed(alt_seed) * 2.0 - 1.0, rand_from_seed(alt_seed) * 2.0 - 1.0) * emission_box_extents;
+	return pos * emission_shape_scale + emission_shape_offset;
+}
+
+//Used twice:
+//Once in start() to calculate initial velocity
+//Once in process(), via one conditional call in process_radial_displacement()
+vec3 get_random_direction_from_spread(inout uint alt_seed, float spread_angle)
+{
+	//I haven't thoroughly analyzed this function
+	float degree_to_rad = PI / 180.0;
+	float spread_rad = spread_angle * degree_to_rad;
+	float angle1_rad = rand_from_seed_neg1_pos1(alt_seed) * spread_rad;
+	float angle2_rad = rand_from_seed_neg1_pos1(alt_seed) * spread_rad * (1.0 - flatness);
+	vec3 direction_xz = vec3(sin(angle1_rad), 0.0, cos(angle1_rad));
+	vec3 direction_yz = vec3(0.0, sin(angle2_rad), cos(angle2_rad));
+	//ORIGINAL: better uniform distribution
+	direction_yz.z = direction_yz.z / max(0.0001,sqrt(abs(direction_yz.z)));
+	vec3 spread_direction = vec3(direction_xz.x * direction_yz.z, direction_yz.y, direction_xz.z * direction_yz.z);
+	vec3 direction_nrm = length(direction) > 0.0 ? normalize(direction) : vec3(0.0, 0.0, 1.0);
+	//ORIGINAL: rotate spread to direction
+	vec3 binormal = cross(vec3(0.0, 1.0, 0.0), direction_nrm);
+	if (length(binormal) < 0.0001)
+	{
+		//ORIGINAL: direction is parallel to Y. Choose Z as the binormal.
+		binormal = vec3(0.0, 0.0, 1.0);
+	}
+	binormal = normalize(binormal);
+	vec3 normal = cross(binormal, direction_nrm);
+	spread_direction = binormal * spread_direction.x + normal * spread_direction.y + direction_nrm * spread_direction.z;
+	return spread_direction;
+}
+
+//Used once in process()
+//I'm not completely sure what it does yet
+vec3 process_radial_displacement(DynamicsParameters param, inout uint alt_seed, mat4 transform, mat4 emission_transform, float delta)
+{
+	vec3 radial_displacement = vec3(0.0);
+	if (delta < 0.001)
+	{
+		return radial_displacement;
+	}
+	float radial_displacement_multiplier = 1.0;
+	vec3 global_pivot = (emission_transform * vec4(velocity_pivot, 1.0)).xyz;
+	if (length(transform[3].xyz - global_pivot) > 0.01)
+	{
+		radial_displacement = normalize(transform[3].xyz - global_pivot) * radial_displacement_multiplier * param.radial_velocity;
+	}
+	else
+	{
+		radial_displacement = get_random_direction_from_spread(alt_seed, 360.0)* param.radial_velocity;
+	} 
+	if (radial_displacement_multiplier * param.radial_velocity < 0.0)
+	{
+		radial_displacement = normalize(radial_displacement) * min(abs((radial_displacement_multiplier * param.radial_velocity)), length(transform[3].xyz - global_pivot) / delta);
+	}
+	return radial_displacement;
+}
+
+// CORE SHADER FUNCTIONS
+// start() and process() are the two core functions of a Godot 4 particle shader
+// Unlike the rest of the functions in this shader, these are required
+
+//start() is called on the spawn of a particle
+void start()
+{
+	//NUMBER is the unique number of this particle since emission start
+	uint base_number = NUMBER;
+	//RANDOM_SEED is an arbitrary random seed used as the base for other random functions
+	//Here we seem to be creating a unique seed for initializing this particle's parameters
+	uint alt_seed = hash(base_number + uint(1) + RANDOM_SEED);
+	//Here we initialize the Display parameters (scale, animation speed/offset, lifetime, color)
+	DisplayParameters display_params;
+	calculate_initial_display_params(display_params, alt_seed, base_number);
+	//We deactivate the particle immediately if it's fully transparent
+	if (display_params.color.a < 0.0001)
+	{
+		ACTIVE = false;
+	}
+	//Here we initialize the Dynamics parameters (angle and several different velocities)
+	DynamicsParameters dynamics_params;
+	calculate_initial_dynamics_params(dynamics_params, alt_seed);
+	//Here we initialize the Phyics parameters (several accelerations and damping)
+	PhysicsParameters physics_params;
+	calculate_initial_physics_params(physics_params, alt_seed);
+	//We choose a random value between 0.0 and 1.0, and deactivate the particle if it's beyond the amount_ratio
+	//AMOUNT_RATIO represents the GPUParticles3D class' own amount_ratio value
+	//Which can be used to gradually change the number of particles in the system
+	if (rand_from_seed(alt_seed) > AMOUNT_RATIO)
+	{
+		ACTIVE = false;
+	}
+	//RESTART_CUSTOM is true if the particle was restarted, or emitted without a custom property
+	if (RESTART_CUSTOM)
+	{
+		//CUSTOM seems to just be an arbitrary vec4 you can store anything in
+		CUSTOM = vec4(0.);
+		//Here we store the particle's intended lifespan as W
+		CUSTOM.w = display_params.lifetime;
+		//CUSTOM.x will be used to track the particle's age, and compared to CUSTOM.w for lifespan calculations
+		//Some notes on my cleanup:
+		//In the generated file, CUSTOM.x was used to store an angle, but the angle was never used
+		//In the generated file, CUSTOM.y was used to store the particle's age; I've moved that to CUSTOM.x, which wasn't being used
+		//In the generated file, CUSTOM.z was used to store animation offset data, but that data was never used
+	}
+	//RESTART_CUSTOM is true if the particle was restarted, or emitted without a custom color
+	if (RESTART_COLOR)
+	{
+		COLOR = display_params.color;
+	}
+	//RESTART_CUSTOM is true if the particle was restarted, or emitted without a custom rotation or scale
+	if (RESTART_ROT_SCALE)
+	{
+		TRANSFORM[0].xyz = vec3(1.0, 0.0, 0.0);
+		TRANSFORM[1].xyz = vec3(0.0, 1.0, 0.0);
+		TRANSFORM[2].xyz = vec3(0.0, 0.0, 1.0);
+	}
+	//RESTART_POSITION is true if the particle was restarted, or emitted without a custom position
+	if (RESTART_POSITION)
+	{
+		TRANSFORM[3].xyz = start_position_from_texture(alt_seed, base_number);
+		TRANSFORM = EMISSION_TRANSFORM * TRANSFORM;
+	}
+	//RESTART_VELOCITY is true if the particle was restarted, or emitted without a custom velocity
+	if (RESTART_VELOCITY)
+	{
+		VELOCITY = get_random_direction_from_spread(alt_seed, spread) * dynamics_params.initial_velocity_multiplier;
+	}
+	//We modify the particle VELOCITY (vec3) by the EMISSION_TRANSFORM matrix (mat4)
+	VELOCITY = (EMISSION_TRANSFORM * vec4(VELOCITY, 0.0)).xyz;
+	//We add EMITTER_VELOCITY (vec3), which represents the velocity defined on the GPUParticles3D node
+	//And modify that by a custom ratio defined as a uniform
+	VELOCITY += EMITTER_VELOCITY * inherit_emitter_velocity_ratio;
+}
+
+//process() is called on each particle after it has been spawned... I think?
+void process()
+{
+	//We retrieve the unique number of this particle since emission start, functionally its stable ID
+	uint base_number = NUMBER;
+	//Here we recaculate the unique seed for calculating this particle's parameters
+	//This will end up being the same as in start()
+	uint alt_seed = hash(base_number + uint(1) + RANDOM_SEED);
+	//Once again, we recalculate the display, dynamics, and physics parameters for this particle
+	DisplayParameters display_params;
+	calculate_initial_display_params(display_params, alt_seed, base_number);
+	DynamicsParameters dynamic_params;
+	calculate_initial_dynamics_params(dynamic_params, alt_seed);
+	PhysicsParameters physics_params;
+	calculate_initial_physics_params(physics_params, alt_seed);
+	//Here, we track where this particle is in its expected lifetime
+	//DELTA is the process time in seconds
+	//LIFETIME is the particle lifetime in seconds 
+	CUSTOM.x += DELTA / LIFETIME;
+	//INTERPOLATE_TO_END represents the GPUParticles3D's interp_to_end property
+	//This controls how much particles interpolate towards the end of their lifetime
+	//Interpolate what? I have no idea
+	CUSTOM.x = mix(CUSTOM.x, 1.0, INTERPOLATE_TO_END);
+	//We deactivate the particle if its age has surpassed its intended lifespan
+	if (CUSTOM.x > CUSTOM.w)
+	{
+		ACTIVE = false;
+	}
+	//We have a scope block here
+	//Presumably this is to more quickly discard from memory all the variables needed to calculate force
+	{
+		//We start by initializing \"force\" as whatever the gravity uniform is set to
+		vec3 force = gravity;
+		//Then we apply linear acceleration
+		force += length(VELOCITY) > 0.0 ? normalize(VELOCITY) * physics_params.linear_accel : vec3(0.0);
+		//Then we apply radial acceleration
+		vec3 position = TRANSFORM[3].xyz;
+		vec3 emission_origin = EMISSION_TRANSFORM[3].xyz;
+		vec3 diff = position - emission_origin;
+		force += length(diff) > 0.0 ? normalize(diff) * physics_params.radial_accel : vec3(0.0);
+		//Then we apply tangential acceleration;
+		float tangent_accel_val = physics_params.tangent_accel;
+		vec3 crossDiff = cross(normalize(diff), normalize(gravity));
+		force += length(crossDiff) > 0.0 ? normalize(crossDiff) * tangent_accel_val : vec3(0.0);
+		//Then we apply ATTRACTOR_FORCE, which represents the combined force of any attractors acting on this particle
+		force += ATTRACTOR_FORCE;
+		//Finally, we apply this combined force multiplied by the process time
+		VELOCITY += force * DELTA;
+	}
+	//If there's damping to perform, we do that here
+	//In the original generated file, this logic block was wrapped in its own scope block, but I don't know why
+	if (physics_params.damping > 0.0)
+	{
+		float damped_velocity = length(VELOCITY);
+		//We proportion the damping according to the process time
+		damped_velocity -= physics_params.damping * DELTA;
+		//If that value isn't positive, the damping has eclipsed the velocity
+		if (damped_velocity < 0.0)
+		{
+			//So we set the velocity to nothing
+			VELOCITY = vec3(0.0);
+		}
+		//If it is positive, the damping is affecting the velocity
+		else
+		{
+			//We normalize VELOCITY to preserve its direction, then multiply by a new length to effect damping
+			VELOCITY = normalize(VELOCITY) * damped_velocity;
+		}
+	}
+	//Here we calculate radial displacement
+	vec3 radial_displacement = vec3(0.0);
+	radial_displacement += process_radial_displacement(dynamic_params, alt_seed, TRANSFORM, EMISSION_TRANSFORM, DELTA);
+	//We add that to the rest of the VELOCITY we've calculated so far
+	//This is what we'll use to directly update the particle's position via TRANSFORM
+	vec3 final_velocity = radial_displacement + VELOCITY;
+	//We update the position here, modifying according to process time
+	TRANSFORM[3].xyz += final_velocity * DELTA;
+	//Update the color to match the display parameter color
+	//WARNING: For this to work, the Material used for the Draw Pass mesh needs to recognize int
+	//You can ensure this by setting the material to a StandardMaterial 3D
+	//Once you have one, go enable \"Vertex Color\">\"Use As Albedo\"
+	//If you want to set the final color here, you'll also want to set Shading>Unshaded, since it's Per-Pixel by default
+	COLOR = display_params.color;
+	//Normalize the rest of TRANSFORM. Note the components of a TRANSFORM in Godot are defined thusly:
+	//0 = rotation
+	//1 = scale
+	//2 = shear
+	//3 = origin (as you can see above, this functions as position)
+	TRANSFORM[0].xyz = normalize(TRANSFORM[0].xyz);
+	TRANSFORM[1].xyz = normalize(TRANSFORM[1].xyz);
+	TRANSFORM[2].xyz = normalize(TRANSFORM[2].xyz);
+	//Here, we layer the scale onto the rest of the transform
+	//Scale is randomly set between two uniforms, scale_min and scale_max
+	//The extra calculations ensure the applied scale is never within less than 0.001 of zero
+	TRANSFORM[0].xyz *= sign(display_params.scale.x) * max(abs(display_params.scale.x), 0.001);
+	TRANSFORM[1].xyz *= sign(display_params.scale.y) * max(abs(display_params.scale.y), 0.001);
+	TRANSFORM[2].xyz *= sign(display_params.scale.z) * max(abs(display_params.scale.z), 0.001);
+	//If the particle's age exceeds its intended lifespan, deactivate it
+	if (CUSTOM.x > CUSTOM.w)
+	{
+		ACTIVE = false;
+	}
+}"

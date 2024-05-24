@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3 uid="uid://5t0f1nxgw7sn"]
+
+[ext_resource type="PackedScene" uid="uid://congrurhwchuv" path="res://DisintegratingSprite.tscn" id="1_x6uu2"]
+
+[node name="Main" type="Node3D"]
+
+[node name="Sprite" parent="." instance=ExtResource("1_x6uu2")]
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 4)

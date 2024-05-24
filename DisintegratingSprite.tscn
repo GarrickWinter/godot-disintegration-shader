@@ -1,0 +1,76 @@
+[gd_scene load_steps=9 format=3 uid="uid://congrurhwchuv"]
+
+[ext_resource type="Texture2D" uid="uid://tukav51prxg" path="res://godobot.png" id="1_dnn0r"]
+[ext_resource type="Shader" path="res://disintegrate_sprite.gdshader" id="1_kdhuj"]
+[ext_resource type="Shader" uid="uid://ch7b5a2yxhjlw" path="res://disintegrate_particles.tres" id="2_jlcvb"]
+[ext_resource type="Script" path="res://DisintegratingSprite.cs" id="2_ykyho"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ixhem"]
+render_priority = 0
+shader = ExtResource("1_kdhuj")
+shader_parameter/cutoff = 0.357736
+shader_parameter/tex = ExtResource("1_dnn0r")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_fquat"]
+shader = ExtResource("2_jlcvb")
+shader_parameter/direction = Vector3(0, 1, 0)
+shader_parameter/spread = 45.0
+shader_parameter/flatness = 1.0
+shader_parameter/inherit_emitter_velocity_ratio = 0.0
+shader_parameter/initial_linear_velocity_min = 1.0
+shader_parameter/initial_linear_velocity_max = 1.0
+shader_parameter/directional_velocity_min = 1.0
+shader_parameter/directional_velocity_max = 1.0
+shader_parameter/angular_velocity_min = 0.0
+shader_parameter/angular_velocity_max = 0.0
+shader_parameter/orbit_velocity_min = 0.0
+shader_parameter/orbit_velocity_max = 0.0
+shader_parameter/radial_velocity_min = 0.0
+shader_parameter/radial_velocity_max = 0.0
+shader_parameter/linear_accel_min = 0.0
+shader_parameter/linear_accel_max = 0.0
+shader_parameter/radial_accel_min = 0.0
+shader_parameter/radial_accel_max = 0.0
+shader_parameter/tangent_accel_min = 0.0
+shader_parameter/tangent_accel_max = 0.0
+shader_parameter/damping_min = 0.0
+shader_parameter/damping_max = 0.0
+shader_parameter/initial_angle_min = 0.0
+shader_parameter/initial_angle_max = 0.0
+shader_parameter/scale_min = 1.0
+shader_parameter/scale_max = 1.0
+shader_parameter/anim_speed_min = 0.0
+shader_parameter/anim_speed_max = 0.0
+shader_parameter/anim_offset_min = 0.0
+shader_parameter/anim_offset_max = 0.0
+shader_parameter/lifetime_randomness = 0.0
+shader_parameter/emission_shape_offset = Vector3(-1.82, 0, 0)
+shader_parameter/emission_shape_scale = Vector3(1, 1, 1)
+shader_parameter/velocity_pivot = Vector3(0, 0, 0)
+shader_parameter/emission_box_extents = Vector3(3.64, 3.44, 0)
+shader_parameter/gravity = Vector3(0, 0, 0)
+shader_parameter/sprite_texture = ExtResource("1_dnn0r")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_3etvq"]
+shading_mode = 0
+vertex_color_use_as_albedo = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_ludet"]
+material = SubResource("StandardMaterial3D_3etvq")
+size = Vector2(0.01, 0.01)
+
+[node name="Sprite" type="Sprite3D"]
+material_override = SubResource("ShaderMaterial_ixhem")
+centered = false
+offset = Vector2(-182, 0)
+texture = ExtResource("1_dnn0r")
+script = ExtResource("2_ykyho")
+disintegration_time = 2.0
+
+[node name="Particles" type="GPUParticles3D" parent="."]
+sorting_offset = 1.0
+amount = 125216
+lifetime = 2.0
+visibility_aabb = AABB(-2, 0, -0.5, 4, 4, 1)
+process_material = SubResource("ShaderMaterial_fquat")
+draw_pass_1 = SubResource("QuadMesh_ludet")
