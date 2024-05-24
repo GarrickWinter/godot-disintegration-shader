@@ -35,10 +35,9 @@ public partial class DisintegratingSprite : Sprite3D
 		float emission_x = texture_size.X * PixelSize;
 		float emission_y = texture_size.Y * PixelSize;
 		ShaderMaterial particleShader = (ShaderMaterial)particles.ProcessMaterial;
+		particleShader.SetShaderParameter("sprite_texture", Texture);
 		particleShader.SetShaderParameter("emission_box_extents", new Vector3(emission_x, emission_y, 0f));
 		particleShader.SetShaderParameter("emission_shape_offset", new Vector3(emission_x / -2f, 0f, 0f));
-
-		//And we need to set the emission speed to something that correctly reflects the rate of disintegration
 	}
 
 	//Called every frame. 'delta' is the elapsed time since the previous frame.
