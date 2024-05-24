@@ -43,32 +43,17 @@ public partial class DisintegratingSprite : Sprite3D
 	//Called every frame. 'delta' is the elapsed time since the previous frame.
 	public override void _Process(double delta)
 	{
+		ShaderMaterial spriteShader = (ShaderMaterial)MaterialOverride;
 		GpuParticles3D particles = GetNode<GpuParticles3D>("Particles");
-		if (disintegrating != particles.Emitting)
-		{
-			lifespan = 0.0;
-			ShaderMaterial spriteShader = (ShaderMaterial)MaterialOverride;
-			if (disintegrating == true)
-			{
-				particles.Emitting = true;
-				particles.Lifetime = disintegration_time;
-			}
-			else
-			{
-				particles.Emitting = false;
-				spriteShader.SetShaderParameter("cutoff", one_shot ? 1f : 0f);
-			}
-		}
-
 		if (disintegrating)
 		{
 			lifespan += delta;
-			ShaderMaterial spriteShader = (ShaderMaterial)MaterialOverride;
-			double ratio = (lifespan % disintegration_time) / disintegration_time;
-			//If we went over disintegration_time, ratio will be very low, causing the sprite to flicker at almost full visibility
+			double ratio = lifespan / disintegration_time;
+			//If we went over disintegration_time, ratio will go from very high to very low, causing the sprite to flicker to almost full visibility
 			//To make sure that doesn't happen, if we exceeded the time, just set the cutoff to exactly 1f
-			if (lifespan >= disintegration_time)
+			if (ratio >= 1.0)
 			{
+				lifespan = 0.0;
 				spriteShader.SetShaderParameter("cutoff", 1f);
 				if (one_shot)
 				{
@@ -80,5 +65,16 @@ public partial class DisintegratingSprite : Sprite3D
 				spriteShader.SetShaderParameter("cutoff", ratio);
 			}
 		}
+		
+		if (disintegrating != particles.Emitting)
+		{
+			lifespan = 0.0;
+			particles.Emitting = disintegrating;
+			if (disintegrating == true)
+			{
+				particles.Lifetime = disintegration_time;
+			}
+		}
+
 	}
 }
