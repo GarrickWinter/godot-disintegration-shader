@@ -30,6 +30,8 @@ public partial class DisintegratingSprite : Sprite3D
 		GpuParticles3D particles = GetNode<GpuParticles3D>("Particles");
 		particles.Amount = (int)(texture_size.X * texture_size.Y);
 		particles.Lifetime = disintegration_time;
+		QuadMesh drawPass = particles.DrawPass1 as QuadMesh;
+		drawPass.Size = new Vector2(PixelSize, PixelSize);
 
 		//We also need to set the bounds and offset of the emission box
 		float emission_x = texture_size.X * PixelSize;

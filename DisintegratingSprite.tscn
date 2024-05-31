@@ -2,13 +2,13 @@
 
 [ext_resource type="Texture2D" uid="uid://tukav51prxg" path="res://godobot.png" id="1_dnn0r"]
 [ext_resource type="Shader" path="res://disintegrate_sprite.gdshader" id="1_kdhuj"]
-[ext_resource type="Shader" uid="uid://ch7b5a2yxhjlw" path="res://disintegrate_particles.tres" id="2_jlcvb"]
+[ext_resource type="Shader" uid="uid://c3ina302lo20w" path="res://disintegrate_particles.tres" id="2_jlcvb"]
 [ext_resource type="Script" path="res://DisintegratingSprite.cs" id="2_ykyho"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_ixhem"]
 render_priority = 0
 shader = ExtResource("1_kdhuj")
-shader_parameter/cutoff = 0.23581
+shader_parameter/cutoff = 0.866587
 shader_parameter/tex = ExtResource("1_dnn0r")
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_fquat"]
@@ -54,6 +54,7 @@ shader_parameter/sprite_texture = ExtResource("1_dnn0r")
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_3etvq"]
 shading_mode = 0
 vertex_color_use_as_albedo = true
+vertex_color_is_srgb = true
 
 [sub_resource type="QuadMesh" id="QuadMesh_ludet"]
 material = SubResource("StandardMaterial3D_3etvq")
