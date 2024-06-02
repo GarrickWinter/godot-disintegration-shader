@@ -12,6 +12,7 @@ public partial class DisintegratingSprite : Sprite3D
 	public bool one_shot = false;
 
 	private double lifespan = 0.0;
+	private double persistent_ratio = 0.0;
 	private Vector2 texture_size;
 
 	//Called when the sprite enters the scene tree for the first time.
@@ -49,13 +50,21 @@ public partial class DisintegratingSprite : Sprite3D
 		GpuParticles3D particles = GetNode<GpuParticles3D>("Particles");
 		if (disintegrating)
 		{
-			lifespan += delta;
-			double ratio = lifespan / disintegration_time;
+			//Particles are emitted at a constant rate every (lifetime/amount) seconds
+			//Meaning (amount/lifetime) particles are emitted per second
+			//For example, 1s particles in a system of 10 will emit 1 particle every 0.1 seconds, for 10 particles per second
+			double particles_per_second = particles.Amount / particles.Lifetime;
+			//That rate is per second, so we need to modify by delta to get the per-frame value
+			double particles_this_frame = particles_per_second * delta;
+			//Finally, compare this to the total number of particles/pixels expected
+			double particle_ratio = particles_this_frame / (texture_size.X * texture_size.Y);
+			//Add that to the persistent ratio
+			persistent_ratio += particle_ratio;
 			//If we went over disintegration_time, ratio will go from very high to very low, causing the sprite to flicker to almost full visibility
 			//To make sure that doesn't happen, if we exceeded the time, just set the cutoff to exactly 1f
-			if (ratio >= 1.0)
+			if (persistent_ratio >= 1.0)
 			{
-				lifespan = 0.0;
+				persistent_ratio = 0.0;
 				spriteShader.SetShaderParameter("cutoff", 1f);
 				if (one_shot)
 				{
@@ -64,19 +73,18 @@ public partial class DisintegratingSprite : Sprite3D
 			}
 			else
 			{
-				spriteShader.SetShaderParameter("cutoff", ratio);
+				spriteShader.SetShaderParameter("cutoff", persistent_ratio);
 			}
 		}
 		
 		if (disintegrating != particles.Emitting)
 		{
-			lifespan = 0.0;
+			persistent_ratio = 0.0;
 			particles.Emitting = disintegrating;
 			if (disintegrating == true)
 			{
 				particles.Lifetime = disintegration_time;
 			}
 		}
-
 	}
 }
