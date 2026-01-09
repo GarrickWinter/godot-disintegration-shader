@@ -1,4 +1,4 @@
-[gd_resource type="Shader" format=3 uid="uid://c3ina302lo20w"]
+[gd_resource type="Shader" format=3 uid="uid://dmr3le4ak725f"]
 
 [resource]
 code = "//GODOT 4.2 PARTICLE SHADER ANALYSIS (4.2.2.stable.mono)

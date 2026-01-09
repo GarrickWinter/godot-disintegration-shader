@@ -8,7 +8,7 @@
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_ixhem"]
 render_priority = 0
 shader = ExtResource("1_kdhuj")
-shader_parameter/cutoff = 1.0
+shader_parameter/cutoff = 0.0
 shader_parameter/tex = ExtResource("1_dnn0r")
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_fquat"]
